@@ -45,15 +45,21 @@ function OverviewPage() {
         完了予定:{' '}
         {new Date(schedule.projected_completion_at).toLocaleString('ja-JP')}
       </p>
-      <div className="mt-6 flex flex-col gap-2">
-        {sortedTasks.map((task) => (
-          <OverviewTaskRow
-            key={task.id}
-            task={task}
-            maxDurationHours={maxDuration}
-          />
-        ))}
-      </div>
+      {sortedTasks.length === 0 ? (
+        <p className="mt-6 text-sm text-muted-foreground">
+          タスクがありません。
+        </p>
+      ) : (
+        <div className="mt-6 flex flex-col gap-2">
+          {sortedTasks.map((task) => (
+            <OverviewTaskRow
+              key={task.id}
+              task={task}
+              maxDurationHours={maxDuration}
+            />
+          ))}
+        </div>
+      )}
     </main>
   )
 }

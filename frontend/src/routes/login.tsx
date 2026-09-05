@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 
@@ -7,8 +8,13 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
-  const handleLogin = () => {
-    supabase.auth.signInWithOAuth({ provider: 'google' })
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    })
+    if (error) {
+      toast.error('ログインに失敗しました。時間をおいて再度お試しください。')
+    }
   }
 
   return (
