@@ -71,7 +71,9 @@ def get_project(
     return project
 
 
-@router.get("/{project_id}/schedule", response_model=ScheduleResponse, operation_id="getProjectSchedule")
+@router.get(
+    "/{project_id}/schedule", response_model=ScheduleResponse, operation_id="getProjectSchedule"
+)
 def get_project_schedule(
     project_id: str,
     user_id: str = Depends(get_current_user_id),
