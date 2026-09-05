@@ -78,7 +78,12 @@ function DashboardPage() {
       ) : (
         <div className="mt-6 flex flex-col gap-3">
           {todayTasks.map((task) => (
-            <TaskCard key={task.id} task={task} onEvent={handleEvent} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onEvent={handleEvent}
+              isSubmitting={eventMutation.isPending}
+            />
           ))}
         </div>
       )}
