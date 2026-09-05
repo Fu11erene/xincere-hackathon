@@ -1,0 +1,38 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Fu11erene", email = "tatsuya91uta4@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=1.4.0",
+    "fastapi>=0.141.1",
+    "networkx>=3.6.1",
+    "pydantic-settings>=2.15.0",
+    "pyjwt>=2.13.0",
+    "supabase>=2.31.0",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.6",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+ignore = ["B008"]  # FastAPI's Depends() pattern relies on call-in-default-argument
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
