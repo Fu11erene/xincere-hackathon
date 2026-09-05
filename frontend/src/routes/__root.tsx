@@ -6,6 +6,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import { type ReactNode, useEffect } from 'react'
+import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider, useAuth } from '@/lib/auth'
 
 const queryClient = new QueryClient()
@@ -21,6 +22,7 @@ function RootComponent() {
         <AuthGate>
           <Outlet />
         </AuthGate>
+        <Toaster />
       </AuthProvider>
     </QueryClientProvider>
   )
