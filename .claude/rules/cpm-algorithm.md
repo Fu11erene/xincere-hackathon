@@ -40,9 +40,16 @@
 ## 4. 学習係数の更新（`complete`/`skip`イベント発生時）
 
 - `complete`時: `pace_coefficient`を指数移動平均で更新
-  `new = 0.3 × (actual_duration_hours / original_estimated_duration_hours) + 0.7 × old`（α=0.3は初期値）
-- `skip`時: 該当カテゴリの`skip_rate_by_category`を「直近N件中のスキップ比率」で更新
-- どちらも`UserPaceProfile`をupsertするのみで、CPM自体はこの時点では再計算しない
+  `new = 0.3 × (actual_duration_hours / original_estimated_duration_hours) + 0.7 × old`（α=0.3は初期値）。
+  比が異常値（放置後の完了等）にならないよう`[0.1, 5.0]`にクランプしてから反映する。
+  `actual_start_at`が未記録（`in_progress`を経由せず`todo`から直接completeした場合）は
+  実作業時間が不明なため、この更新自体をスキップする
+- `skip_rate_by_category`: 該当カテゴリの「直近イベントがスキップだったか」を0/1の指標として、
+  `complete`/`skip`どちらのイベントでも指数移動平均で更新する（α=0.3）。`skip`時のみの更新だと
+  減衰させる機会がなく、一度スキップが続いたカテゴリのバッファが下がらなくなるため
+- 完了済み（`status == done`）のタスクへの再イベント送信は409で拒否し、実績値・pace_coefficientの
+  二重反映を防ぐ
+- いずれも`UserPaceProfile`をupsertするのみで、CPM自体はこの時点では再計算しない
 
 ## 5. 再計算タイミング
 

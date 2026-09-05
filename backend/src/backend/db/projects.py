@@ -13,7 +13,7 @@ from supabase import Client
 from backend.schemas import ProjectDetail, ProjectSummary, TaskPreview, TaskResponse
 
 
-def _task_row_to_response(row: dict, depends_on: list[str]) -> TaskResponse:
+def task_row_to_response(row: dict, depends_on: list[str]) -> TaskResponse:
     return TaskResponse(
         id=row["id"],
         project_id=row["project_id"],
@@ -157,7 +157,7 @@ def get_project(db: Client, user_id: str, project_id: str) -> ProjectDetail | No
             depends_on_by_task_id[dep_row["task_id"]].append(dep_row["depends_on_task_id"])
 
     task_responses = [
-        _task_row_to_response(row, depends_on=depends_on_by_task_id[row["id"]]) for row in task_rows
+        task_row_to_response(row, depends_on=depends_on_by_task_id[row["id"]]) for row in task_rows
     ]
 
     return ProjectDetail(
