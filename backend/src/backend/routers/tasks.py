@@ -6,7 +6,7 @@ from backend.schemas import ProgressEventRequest, TaskResponse
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-@router.post("/{task_id}/events", response_model=TaskResponse)
+@router.post("/{task_id}/events", response_model=TaskResponse, operation_id="recordTaskEvent")
 def record_task_event(
     task_id: str,
     body: ProgressEventRequest,

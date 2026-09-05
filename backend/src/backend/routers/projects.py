@@ -26,7 +26,7 @@ from backend.validation import validate_task_graph
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-@router.post("/preview", response_model=ProjectPreviewResponse)
+@router.post("/preview", response_model=ProjectPreviewResponse, operation_id="previewProject")
 def preview_project(
     body: ProjectPreviewRequest,
     user_id: str = Depends(get_current_user_id),
@@ -38,7 +38,7 @@ def preview_project(
     return ProjectPreviewResponse(tasks=tasks)
 
 
-@router.post("", response_model=ProjectDetail, status_code=201)
+@router.post("", response_model=ProjectDetail, status_code=201, operation_id="createProject")
 def create_project(
     body: ProjectCreateRequest,
     user_id: str = Depends(get_current_user_id),
@@ -49,7 +49,7 @@ def create_project(
     return projects_db.create_project(db, user_id, body.goal_text, body.deadline, body.tasks)
 
 
-@router.get("", response_model=list[ProjectSummary])
+@router.get("", response_model=list[ProjectSummary], operation_id="listProjects")
 def list_projects(
     user_id: str = Depends(get_current_user_id),
     db: Client = Depends(get_supabase_client),
@@ -58,7 +58,7 @@ def list_projects(
     return projects_db.list_projects(db, user_id)
 
 
-@router.get("/{project_id}", response_model=ProjectDetail)
+@router.get("/{project_id}", response_model=ProjectDetail, operation_id="getProject")
 def get_project(
     project_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -71,7 +71,7 @@ def get_project(
     return project
 
 
-@router.get("/{project_id}/schedule", response_model=ScheduleResponse)
+@router.get("/{project_id}/schedule", response_model=ScheduleResponse, operation_id="getProjectSchedule")
 def get_project_schedule(
     project_id: str,
     user_id: str = Depends(get_current_user_id),
