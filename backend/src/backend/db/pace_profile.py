@@ -8,6 +8,12 @@ from backend.cpm.schedule import PaceProfile
 # skip_rate_by_categoryの両方で同じ値を使う。
 LEARNING_RATE = 0.3
 
+# 実績/見積り比(pace_ratio)のクランプ範囲。actual_start_atの取り違えや時計スキュー
+# 等で異常値(例: 数日放置後の完了で比が数十倍になる)がpace_coefficientに
+# そのまま反映され、以降の全タスクの見積りが破綻するのを防ぐ。
+MIN_PACE_RATIO = 0.1
+MAX_PACE_RATIO = 5.0
+
 
 def get_pace_profile(db: Client, user_id: str) -> PaceProfile:
     rows = db.table("user_pace_profile").select("*").eq("user_id", user_id).execute().data
@@ -42,6 +48,7 @@ def compute_pace_profile_update(
         and original_estimated_duration_hours > 0
     ):
         pace_ratio = actual_duration_hours / original_estimated_duration_hours
+        pace_ratio = min(max(pace_ratio, MIN_PACE_RATIO), MAX_PACE_RATIO)
         new_pace_coefficient = (
             LEARNING_RATE * pace_ratio + (1 - LEARNING_RATE) * pace_profile.pace_coefficient
         )

@@ -66,6 +66,37 @@ def test_zero_original_estimate_does_not_divide_by_zero():
     assert updated.pace_coefficient == 1.0
 
 
+def test_pace_ratio_is_clamped_to_upper_bound():
+    profile = PaceProfile(pace_coefficient=1.0, skip_rate_by_category={})
+
+    updated = compute_pace_profile_update(
+        profile,
+        category="実装",
+        event_type="complete",
+        # 見積り2hに対し実績72h(3日放置後の完了)。クランプなしだと比が36倍になる。
+        actual_duration_hours=72.0,
+        original_estimated_duration_hours=2.0,
+    )
+
+    # 比は MAX_PACE_RATIO(5.0)にクランプされる: 0.3 * 5.0 + 0.7 * 1.0 = 2.2
+    assert updated.pace_coefficient == pytest.approx(2.2)
+
+
+def test_pace_ratio_is_clamped_to_lower_bound():
+    profile = PaceProfile(pace_coefficient=1.0, skip_rate_by_category={})
+
+    updated = compute_pace_profile_update(
+        profile,
+        category="実装",
+        event_type="complete",
+        actual_duration_hours=0.01,
+        original_estimated_duration_hours=2.0,
+    )
+
+    # 比はMIN_PACE_RATIO(0.1)にクランプされる: 0.3 * 0.1 + 0.7 * 1.0 = 0.73
+    assert updated.pace_coefficient == pytest.approx(0.73)
+
+
 def test_other_categories_are_preserved():
     profile = PaceProfile(pace_coefficient=1.0, skip_rate_by_category={"設計": 0.5})
 

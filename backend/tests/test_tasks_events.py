@@ -237,3 +237,117 @@ def test_event_for_nonexistent_task_returns_404():
     response = _post_event(db, "does-not-exist", "complete")
 
     assert response.status_code == 404
+
+
+def test_event_for_already_done_task_returns_409():
+    tasks_table = _table_mock()
+    tasks_table.select.return_value.eq.return_value.execute.return_value = SimpleNamespace(
+        data=[
+            {
+                "id": "task-1",
+                "project_id": "project-1",
+                "category": "実装",
+                "original_estimated_duration_hours": 2.0,
+                "status": "done",
+                "actual_start_at": "2026-09-05T00:00:00+00:00",
+                "actual_end_at": "2026-09-05T02:00:00+00:00",
+                "skip_count": 0,
+                "created_at": "2026-09-05T00:00:00+00:00",
+            }
+        ]
+    )
+
+    projects_table = _table_mock()
+    projects_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+        SimpleNamespace(data=[{"id": "project-1", "user_id": "user-1"}])
+    )
+
+    db = _fake_db({"tasks": tasks_table, "projects": projects_table})
+
+    response = _post_event(db, "task-1", "complete")
+
+    assert response.status_code == 409
+    tasks_table.update.assert_not_called()
+
+
+def test_complete_without_prior_actual_start_at_skips_pace_update():
+    """in_progressを経由せずtodoから直接completeされた場合、created_atからの
+    経過時間は実作業時間の指標にならないため、pace_coefficientの更新自体を
+    スキップする(#backend/src/backend/db/progress_events.pyの分岐を参照)。
+    """
+    tasks_table = _table_mock()
+    tasks_table.select.return_value.eq.return_value.execute.return_value = SimpleNamespace(
+        data=[
+            {
+                "id": "task-1",
+                "project_id": "project-1",
+                "category": "実装",
+                "original_estimated_duration_hours": 2.0,
+                "status": "todo",
+                "actual_start_at": None,
+                "actual_end_at": None,
+                "skip_count": 0,
+                # 3日前に作成された(かつ一度もin_progressになっていない)タスク。
+                # このcreated_atをそのまま実績時間の起点に使うと、比が異常値になる。
+                "created_at": "2026-09-02T00:00:00+00:00",
+            }
+        ]
+    )
+    tasks_table.update.return_value.eq.return_value.execute.return_value = SimpleNamespace(
+        data=[
+            {
+                "id": "task-1",
+                "project_id": "project-1",
+                "name": "実装する",
+                "category": "実装",
+                "original_estimated_duration_hours": 2.0,
+                "current_estimated_duration_hours": 2.0,
+                "status": "done",
+                "actual_start_at": "2026-09-05T00:00:00+00:00",
+                "actual_end_at": "2026-09-05T00:00:00+00:00",
+                "skip_count": 0,
+            }
+        ]
+    )
+
+    projects_table = _table_mock()
+    projects_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+        SimpleNamespace(data=[{"id": "project-1", "user_id": "user-1"}])
+    )
+
+    progress_events_table = _table_mock()
+    deps_table = _table_mock()
+    deps_table.select.return_value.eq.return_value.execute.return_value = SimpleNamespace(data=[])
+
+    pace_profile_table = _table_mock()
+    pace_profile_table.select.return_value.eq.return_value.execute.return_value = SimpleNamespace(
+        data=[]
+    )
+
+    db = _fake_db(
+        {
+            "tasks": tasks_table,
+            "projects": projects_table,
+            "progress_events": progress_events_table,
+            "task_dependencies": deps_table,
+            "user_pace_profile": pace_profile_table,
+        }
+    )
+
+    fixed_now = datetime(2026, 9, 5, 0, 0, 0, tzinfo=UTC)
+    with patch("backend.db.progress_events.datetime") as mock_datetime:
+        mock_datetime.now.return_value = fixed_now
+        mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+        response = _post_event(db, "task-1", "complete")
+
+    assert response.status_code == 200
+
+    inserted = progress_events_table.insert.call_args[0][0]
+    assert inserted["actual_duration_hours"] is None
+
+    updated_task = tasks_table.update.call_args[0][0]
+    assert updated_task["actual_start_at"] == fixed_now.isoformat()
+
+    upserted = pace_profile_table.upsert.call_args[0][0]
+    # pace_coefficientはデフォルト値(1.0)のまま更新されない
+    assert upserted["pace_coefficient"] == 1.0

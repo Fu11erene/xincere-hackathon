@@ -14,6 +14,10 @@ from backend.db.projects import task_row_to_response
 from backend.schemas import TaskResponse
 
 
+class TaskAlreadyDoneError(Exception):
+    """完了済みのtaskに対して進捗イベントが送られた場合に送出する。"""
+
+
 def record_task_event(
     db: Client,
     user_id: str,
@@ -24,6 +28,9 @@ def record_task_event(
 
     taskが存在しない、または他ユーザーのtaskの場合はNoneを返す
     (auth-and-data-isolation.mdの方針により、存在有無を明かさず404扱いにする)。
+    既にstatus=='done'のtaskに対して呼ばれた場合はTaskAlreadyDoneErrorを送出する
+    (cpm-algorithm.md §1の「doneタスクは固定アンカーとして扱い再計算しない」という
+    前提を守るため。二重クリックや再送で実績値・pace_coefficientが歪むのを防ぐ)。
     """
     task_rows = db.table("tasks").select("*").eq("id", task_id).execute().data
     if not task_rows:
@@ -41,16 +48,29 @@ def record_task_event(
     if not project_rows:
         return None
 
+    if task_row["status"] == "done":
+        raise TaskAlreadyDoneError(f"Task {task_id} is already done")
+
     now = datetime.now(UTC)
     original_estimated_duration_hours = task_row["original_estimated_duration_hours"]
     actual_duration_hours: float | None = None
 
     task_update: dict = {}
     if event_type == "complete":
-        actual_start_at = task_row["actual_start_at"] or task_row["created_at"]
-        actual_duration_hours = (
-            now - datetime.fromisoformat(actual_start_at)
-        ).total_seconds() / 3600
+        previous_actual_start_at = task_row["actual_start_at"]
+        if previous_actual_start_at:
+            actual_duration_hours = (
+                now - datetime.fromisoformat(previous_actual_start_at)
+            ).total_seconds() / 3600
+            actual_start_at = previous_actual_start_at
+        else:
+            # 開始時刻が記録されていない(in_progressを経由せずtodoから直接
+            # completeされた)場合、created_atからの経過時間は実作業時間の
+            # 指標にならない(数日放置後に完了、等)。実績時間が不明な以上、
+            # nowを開始・終了の両方に使い、pace_coefficientの更新は
+            # actual_duration_hours=Noneとしてスキップする
+            # (compute_pace_profile_updateのガード参照)。
+            actual_start_at = now.isoformat()
         task_update = {
             "status": "done",
             "actual_start_at": actual_start_at,
@@ -62,7 +82,12 @@ def record_task_event(
         # docstring、および[[cpm-algorithm]]参照)。
         task_update = {"skip_count": task_row["skip_count"] + 1}
 
-    updated_task_row = db.table("tasks").update(task_update).eq("id", task_id).execute().data[0]
+    updated_rows = db.table("tasks").update(task_update).eq("id", task_id).execute().data
+    if not updated_rows:
+        # RLSや競合削除等でUPDATEが0行しかヒットしなかった場合。呼び出し元は
+        # Noneを404として扱うため、この経路でも同様に扱う。
+        return None
+    updated_task_row = updated_rows[0]
 
     db.table("progress_events").insert(
         {
