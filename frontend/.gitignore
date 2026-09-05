@@ -12,9 +12,6 @@ dist
 dist-ssr
 *.local
 
-# TanStack Router auto-generated route tree
-src/routeTree.gen.ts
-
 .env
 
 # Editor directories and files

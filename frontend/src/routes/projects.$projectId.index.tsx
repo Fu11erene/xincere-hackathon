@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import {
   getGetProjectScheduleQueryKey,
   useGetProjectSchedule,
@@ -9,7 +10,7 @@ import { TaskCard } from '@/components/TaskCard'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
-export const Route = createFileRoute('/projects/$projectId')({
+export const Route = createFileRoute('/projects/$projectId/')({
   component: DashboardPage,
 })
 
@@ -27,6 +28,9 @@ function DashboardPage() {
           queryClient.invalidateQueries({
             queryKey: getGetProjectScheduleQueryKey(projectId),
           })
+        },
+        onError: () => {
+          toast.error('進捗の記録に失敗しました')
         },
       },
     )
